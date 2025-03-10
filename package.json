@@ -9,7 +9,7 @@
     "dev": "nodemon bot.js"
   },
   "keywords": ["discord", "ai", "chatbot"],
-  "author": "",
+  "author": "aggeloskwn",
   "license": "ISC",
   "dependencies": {
     "discord.js": "^14.18.0",

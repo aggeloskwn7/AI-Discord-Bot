@@ -1,4 +1,5 @@
 const { RateLimiterMemory } = require('rate-limiter-flexible');
+const { logError } = require('./errorHandler');
 
 const rateLimiter = new RateLimiterMemory({
     points: 3, // Allow 3 messages per user
@@ -9,7 +10,14 @@ async function checkRateLimit(userId) {
     try {
         await rateLimiter.consume(userId);
         return true;
-    } catch {
+    } catch (error) {
+        if (error.consumedPoints !== undefined) {
+            // User hit the rate limit
+            return false;
+        }
+
+        // Log unexpected errors
+        logError(error);
         return false;
     }
 }
