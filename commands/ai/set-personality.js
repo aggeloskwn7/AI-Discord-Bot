@@ -1,56 +1,75 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, PermissionsBitField } = require('discord.js');
 const ServerSettings = require('../../database/models/ServerSettings');
 const { logError } = require('../../utils/errorHandler');
+
+// Predefined personality types with their system instructions
+const PERSONALITIES = {
+    friendly: "You are a friendly and approachable person who loves making new friends. You're warm, encouraging, and always ready to help.",
+    sarcastic: "You are witty and sarcastic, with a dry sense of humor. You love making clever observations and playful jabs.",
+    professional: "You are a knowledgeable and professional individual who provides well-thought-out, accurate information.",
+    funny: "You are hilarious and love making jokes. You're playful, use puns, and keep the conversation light and entertaining.",
+    philosophical: "You are deep and thoughtful, often pondering life's big questions. You engage in meaningful discussions.",
+    casual: "You are laid-back and chill, using casual language and keeping things simple and relatable."
+};
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('set-personality')
-        .setDescription('Customize AI personality (Admins Only)')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator) // Restrict command to admins
+        .setDescription('Change the AI\'s personality type')
         .addStringOption(option =>
             option.setName('type')
-                .setDescription('Set the AI personality')
+                .setDescription('Choose a personality type')
                 .setRequired(true)
                 .addChoices(
-                    { name: 'Funny AI', value: 'Funny AI' },
-                    { name: 'Professional AI', value: 'Professional AI' },
-                    { name: 'Sarcastic AI', value: 'Sarcastic AI' },
-                    { name: 'Default AI', value: 'Default AI' }
+                    { name: 'Friendly', value: 'friendly' },
+                    { name: 'Sarcastic', value: 'sarcastic' },
+                    { name: 'Professional', value: 'professional' },
+                    { name: 'Funny', value: 'funny' },
+                    { name: 'Philosophical', value: 'philosophical' },
+                    { name: 'Casual', value: 'casual' }
                 )
         ),
+
     async execute(interaction) {
         try {
-            // Ensure command is used in a guild
-            if (!interaction.guild) {
-                return interaction.reply({ content: "❌ This command can only be used in a server.", ephemeral: true });
+            // Check if user has admin permissions
+            if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+                return interaction.reply({
+                    content: "❌ Only administrators can change the AI's personality.",
+                    ephemeral: true
+                });
             }
 
-            // Ensure only admins can use this command
-            if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-                return interaction.reply({ content: "❌ You need `Administrator` permission to use this command.", ephemeral: true });
+            const personalityType = interaction.options.getString('type');
+            const systemInstruction = PERSONALITIES[personalityType];
+
+            if (!systemInstruction) {
+                return interaction.reply({
+                    content: "❌ Invalid personality type selected.",
+                    ephemeral: true
+                });
             }
 
-            const selectedPersonality = interaction.options.getString('type');
-
-            // Enforce AI behavior constraints
-            const finalPersonality = `${selectedPersonality} - Never speak like an AI, always act cool, chill, and engaging in conversations like a real person.`;
-
-            // Update only the personality field, keeping other settings intact
-            const updatedSettings = await ServerSettings.findOneAndUpdate(
+            // Update server settings with new personality
+            await ServerSettings.findOneAndUpdate(
                 { guildId: interaction.guild.id },
-                { $set: { personality: finalPersonality } },
+                { 
+                    personalityType,
+                    systemInstruction
+                },
                 { upsert: true, new: true }
             );
 
-            if (!updatedSettings) {
-                throw new Error("Failed to update server settings.");
-            }
-
-            await interaction.reply({ content: `✅ AI personality set to **${selectedPersonality}** (Modified to always stay cool and never sound like an AI).` });
-
+            await interaction.reply({
+                content: `✅ AI personality has been set to **${personalityType}** mode!`,
+                ephemeral: true
+            });
         } catch (error) {
             logError(error);
-            await interaction.reply({ content: "⚠️ An error occurred while updating AI personality. Please try again later.", ephemeral: true });
+            await interaction.reply({
+                content: "⚠️ An error occurred while setting the personality.",
+                ephemeral: true
+            });
         }
     }
 };

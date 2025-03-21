@@ -3,6 +3,7 @@ const ServerSettings = require('../../database/models/ServerSettings');
 const UserSessions = require('../../database/models/UserSessions');
 const { OpenAI } = require('openai');
 const { logError } = require('../../utils/errorHandler');
+const rateLimiter = require('../../utils/rateLimiter');
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -53,6 +54,13 @@ module.exports.listenForMessages = async (message) => {
         const guildId = message.guild.id;
         const userMessage = message.content;
 
+        // Check rate limit
+        const rateLimitResult = await rateLimiter.checkRateLimit(userId, guildId);
+        if (!rateLimitResult.allowed) {
+            await message.reply(rateLimitResult.message);
+            return;
+        }
+
         // Retrieve existing conversation history
         let session = await UserSessions.findOne({ userId, guildId });
         if (!session) {
@@ -89,7 +97,9 @@ module.exports.listenForMessages = async (message) => {
         session.history.push({ role: 'assistant', content: aiResponse });
         await session.save();
 
-        await message.reply(aiResponse);
+        // Add remaining requests info to response
+        const responseWithRateInfo = `${aiResponse}\n\n*You have ${rateLimitResult.remaining} requests remaining this minute.*`;
+        await message.reply(responseWithRateInfo);
     } catch (error) {
         logError(error);
         await message.reply("⚠️ AI is currently unavailable. Please try again later.");
