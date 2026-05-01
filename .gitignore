@@ -1,0 +1,11 @@
+.env
+node_modules/
+package-lock.json
+logs.txt
+logs/
+*.log
+database.sqlite
+dist/
+build/
+.DS_Store
+Thumbs.db
